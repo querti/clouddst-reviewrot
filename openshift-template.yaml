@@ -1,0 +1,297 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: clouddst-reviewrot-template
+  labels:
+    app: clouddst-reviewrot
+parameters:
+  - name: BACKEND_IMAGE
+    required: true
+  - name: FRONTEND_HOSTNAME
+    required: true
+objects:
+  - apiVersion: v1
+    kind: BuildConfig
+    metadata:
+      name: clouddst-reviewrot-frontend
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      output:
+        to:
+          kind: ImageStreamTag
+          name: clouddst-reviewrot-frontend:latest
+      runPolicy: Serial
+      source:
+        type: Git
+        contextDir: frontend
+        git:
+          uri: https://github.com/querti/clouddst-reviewrot.git
+          ref: master
+      strategy:
+        type: Docker
+        dockerStrategy:
+          from:
+            kind: ImageStreamTag
+            name: nonroot-nginx:latest
+          noCache: true
+      triggers:
+        - github:
+            secretReference:
+              name: clouddst-reviewrot-frontend
+          type: GitHub
+        - type: ConfigChange
+        - imageChange:
+          type: ImageChange
+
+  - apiVersion: v1
+    kind: BuildConfig
+    metadata:
+      name: clouddst-reviewrot-backend
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      output:
+        to:
+          kind: ImageStreamTag
+          name: clouddst-reviewrot-backend:latest
+      runPolicy: Serial
+      source:
+        type: Git
+        contextDir: backend
+        git:
+          uri: https://github.com/querti/clouddst-reviewrot.git
+          ref: master
+      strategy:
+        type: Docker
+        dockerStrategy:
+          from:
+            kind: ImageStreamTag
+            name: centos:7
+          noCache: true
+      triggers:
+        - github:
+            secretReference:
+              name: clouddst-reviewrot-backend
+          type: GitHub
+        - type: ConfigChange
+        - imageChange:
+          type: ImageChange
+
+  - apiVersion: v1
+    kind: ImageStream
+    metadata:
+      name: nonroot-nginx
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      dockerImageRepository: ""
+      tags:
+        - from:
+            kind: DockerImage
+            name: tomaskral/nonroot-nginx
+          name: latest
+
+  - apiVersion: v1
+    kind: ImageStream
+    metadata:
+      name: centos
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      dockerImageRepository: ""
+      tags:
+        - from:
+            kind: DockerImage
+            name: centos:7
+          name: "7"
+
+  - apiVersion: v1
+    kind: ImageStream
+    metadata:
+      name: clouddst-reviewrot-frontend
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      dockerImageRepository: ""
+      tags:
+        - name: latest
+
+  - apiVersion: v1
+    kind: ImageStream
+    metadata:
+      name: clouddst-reviewrot-backend
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      dockerImageRepository: ""
+      tags:
+        - name: latest
+
+  - apiVersion: batch/v1beta1
+    kind: CronJob
+    metadata:
+      name: clouddst-reviewrot-backend
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      successfulJobsHistoryLimit: 2
+      failedJobsHistoryLimit: 2
+      schedule: "0/10 * * * *"
+      concurrencyPolicy: Forbid
+      # When the concurrencyPolicy is set to Forbid, and something
+      # prevents the Pod from running, Kubernetes may stop attempting
+      # to schedule it altogether. Increase startingDeadlineSeconds to
+      # to allow manual intervention:
+      # https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations
+      startingDeadlineSeconds: 864000  # 10 days
+      jobTemplate:
+        spec:
+          template:
+            metadata:
+              labels:
+                parent: "cronjobreviewrot"
+            spec:
+              containers:
+                - name: clouddst-reviewrot-backend
+                  image: clouddst-reviewrot-backend
+                  imagePullPolicy: Always
+                  env:
+                    - name: GITHUB_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: clouddst-reviewrot-backend
+                          key: github-token
+                    - name: GITLAB_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: clouddst-reviewrot-backend
+                          key: gitlab-token
+                    - name: GITLAB_SYSOPS_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: clouddst-reviewrot-backend
+                          key: gitlab-sysops-token
+                    - name: REQUESTS_CA_BUNDLE
+                      value: /etc/pki/tls/certs/ca-bundle.crt
+                    - name: CA_URL
+                      value: https://password.corp.redhat.com/RH-IT-Root-CA.crt
+                  volumeMounts:
+                    - name: clouddst-reviewrot-data
+                      mountPath: /opt/data
+                    - name: clouddst-reviewrot-config
+                      mountPath: /secret
+              restartPolicy: OnFailure
+              volumes:
+                - name: clouddst-reviewrot-data
+                  persistentVolumeClaim:
+                    claimName: clouddst-reviewrot-data
+                - name: clouddst-reviewrot-config
+                  configMap:
+                    name: clouddst-reviewrot-config
+          triggers:
+            - type: ConfigChange
+            - type: ImageChange
+              imageChangeParams:
+                automatic: true
+                containerNames:
+                  - clouddst-reviewrot-backend
+                from:
+                  kind: ImageStreamTag
+                  name: clouddst-reviewrot-backend:latest
+
+  - apiVersion: v1
+    kind: DeploymentConfig
+    metadata:
+      name: clouddst-reviewrot-frontend
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      replicas: 1
+      selector:
+        deploymentConfig: clouddst-reviewrot-frontend
+      strategy:
+        type: Rolling
+        rollingParams:
+          intervalSeconds: 1
+          maxSurge: 25%
+          maxUnavailable: 25%
+          timeoutSeconds: 600
+          updatePeriodSeconds: 1
+      template:
+        metadata:
+          labels:
+            deploymentConfig: clouddst-reviewrot-frontend
+            app: clouddst-reviewrot
+        spec:
+          containers:
+            - name: clouddst-reviewrot-frontend
+              image: clouddst-reviewrot-frontend
+              imagePullPolicy: Always
+              ports:
+                - containerPort: 8080
+                  protocol: TCP
+              resources: {}
+              volumeMounts:
+                - name: clouddst-reviewrot-data
+                  mountPath: /opt/data
+          restartPolicy: Always
+          volumes:
+            - name: clouddst-reviewrot-data
+              persistentVolumeClaim:
+                claimName: clouddst-reviewrot-data
+      triggers:
+        - type: ConfigChange
+        - type: ImageChange
+          imageChangeParams:
+            automatic: true
+            containerNames:
+              - clouddst-reviewrot-frontend
+            from:
+              kind: ImageStreamTag
+              name: clouddst-reviewrot-frontend:latest
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: clouddst-reviewrot-frontend
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      selector:
+        deploymentConfig: clouddst-reviewrot-frontend
+      ports:
+        - name: web
+          port: 80
+          protocol: TCP
+          targetPort: 8080
+
+  - apiVersion: v1
+    kind: Route
+    metadata:
+      name: clouddst-reviewrot-frontend
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      host: ${FRONTEND_HOSTNAME}
+      port:
+        targetPort: web
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+      to:
+        kind: Service
+        name: clouddst-reviewrot-frontend
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: clouddst-reviewrot-data
+      labels:
+        app: clouddst-reviewrot
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: "1Gi"

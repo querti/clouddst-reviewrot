@@ -1,0 +1,57 @@
+git_services:
+  - type: github
+    host: github.com
+    token: ENV.GITHUB_TOKEN
+    repos:
+    - release-engineering/iib
+    - release-engineering/cdn-definitions
+    - release-engineering/dockpulp
+    - release-engineering/pubtools-pulplib
+    - release-engineering/pushsource
+    - release-engineering/kobo
+    - release-engineering/pubtools-iib
+    - release-engineering/alt-src
+    - release-engineering/iiblib
+    - release-engineering/pubtools-pulp
+    - release-engineering/content-delivery-team
+    - release-engineering/cloudimg
+    - release-engineering/pushcollector
+    - release-engineering/python-fastpurge
+  - type: gitlab
+    host: https://gitlab.cee.redhat.com
+    token: ENV.GITLAB_TOKEN
+    repos:
+    - ansible-roles/iib-web
+    - ansible-roles/iib-worker
+    - ansible-roles/pub_client
+    - ansible-roles/pulp-secret
+    - ansible-roles/rcm-kerberos
+    - ansible-roles/rcm-prod
+    - ansible-roles/pub
+    - ansible-roles/manifest-api
+    - ansible-roles/rcm-messages
+    - ansible-playbooks/iib-playbooks
+    - ansible-playbooks/manifest-api-playbooks
+  - type: gerrit
+    host: https://code.engineering.redhat.com/gerrit
+    reviewers:
+      ensure: True
+      excluded:
+        - rmcgover+content-delivery-jenkins@redhat.com
+    repos:
+      - cdtools
+      - content-delivery-jenkins
+      - rcm-pulp
+      - rcm-pulp-rpm
+      - cdn-utils
+      - engproduct-cli
+      - pulp-utils
+      - rhsm-tools
+      - rcm-kerberos
+      - rcm-repoquery
+      - rcm-threadpool
+      - rcm/rcm-pa-tool
+      - rcm/rh-altsrc-tools
+      - rcm/rh-altsrc-rules
+      - rcm/manifest-api
+      - rcm-pub
