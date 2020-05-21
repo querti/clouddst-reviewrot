@@ -41,6 +41,7 @@ git_services:
     repos:
       - cdtools
       - content-delivery-jenkins
+      - content-delivery-qe
       - rcm-pulp
       - rcm-pulp-rpm
       - cdn-utils

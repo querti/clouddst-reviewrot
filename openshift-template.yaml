@@ -95,7 +95,7 @@ objects:
   - apiVersion: v1
     kind: ImageStream
     metadata:
-      name: centos
+      name: fedora
       labels:
         app: clouddst-reviewrot
     spec:
@@ -103,8 +103,8 @@ objects:
       tags:
         - from:
             kind: DockerImage
-            name: centos:7
-          name: "7"
+            name: fedora:30
+          name: "30"
 
   - apiVersion: v1
     kind: ImageStream
@@ -137,7 +137,7 @@ objects:
     spec:
       successfulJobsHistoryLimit: 2
       failedJobsHistoryLimit: 2
-      schedule: "0/10 * * * *"
+      schedule: "*/10 * * * *"
       concurrencyPolicy: Forbid
       # When the concurrencyPolicy is set to Forbid, and something
       # prevents the Pod from running, Kubernetes may stop attempting
@@ -154,7 +154,7 @@ objects:
             spec:
               containers:
                 - name: clouddst-reviewrot-backend
-                  image: clouddst-reviewrot-backend
+                  image: ${BACKEND_IMAGE}
                   imagePullPolicy: Always
                   env:
                     - name: GITHUB_TOKEN
@@ -167,11 +167,6 @@ objects:
                         secretKeyRef:
                           name: clouddst-reviewrot-backend
                           key: gitlab-token
-                    - name: GITLAB_SYSOPS_TOKEN
-                      valueFrom:
-                        secretKeyRef:
-                          name: clouddst-reviewrot-backend
-                          key: gitlab-sysops-token
                     - name: REQUESTS_CA_BUNDLE
                       value: /etc/pki/tls/certs/ca-bundle.crt
                     - name: CA_URL

@@ -2,6 +2,9 @@ An openshift deployment of review-rot
 
 https://github.com/redhat-aqe/review-rot/pull/44
 
+All credit goes to Ralph Bean and his project:
+https://github.com/ralphbean/f2-reviewrot-openshift
+
 ---
 
 # Steps for initial project creation in OpenShift
@@ -95,6 +98,6 @@ And finally, process the template
 ```
 oc process clouddst-reviewrot-template \
 -p FRONTEND_HOSTNAME=clouddst-reviews.cloud.paas.psi.redhat.com \
--p BACKEND_IMAGE=docker-registry.default.svc:5000/clouddst-reviewrot/clouddst-reviewrot-backend \
+-p BACKEND_IMAGE=docker-registry.default.svc:5000/exd-sp-cloud-dist/clouddst-reviewrot-backend \
 | oc apply -f -
 ```
